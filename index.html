@@ -419,29 +419,83 @@ tr.total-row td{font-weight:700;background:#eef2f9;border-top:2px solid var(--pr
         <p class="desc">Consolidação e Estimativa de Entregas da SDR (Siconv/Transferegov)</p>
         <div class="meta-secao">
           <h3>1. Introdução</h3>
-          <p>Este painel consolida e categoriza os pagamentos realizados via instrumentos de transferência voluntária (convênios, contratos de repasse e termos de fomento) firmados pelas Unidades Gestoras da SDR (530023, 530020, 530036 e 74019) com municípios, estados e entidades. Os dados são extraídos do SICONV/Transferegov e cobrem o período de 2003 a 2026.</p>
+          <p>Este relatório descreve o fluxo metodológico do script de processamento de dados desenvolvido para extrair, categorizar e agregar dados brutos do Siconv. O pipeline gera tabelas consolidadas com foco nas entregas da Secretaria de Desenvolvimento Regional (SDR), com destaque para a nova etapa de higienização de métricas físicas e estimativa avançada de área pavimentada (em m²), posteriormente convertida para Km por meio da multiplicação por 6 mil.</p>
         </div>
         <div class="meta-secao">
-          <h3>2. Filtros de Escopo</h3>
-          <p>Restrição ao Órgão Superior 53000 (MIDR). Exclusão de projetos básicos rejeitados e convênios não assinados, rescindidos ou anulados. Foco em UGs específicas da SDR. Seleção estrita de itens de liquidação com valores válidos documentados.</p>
-        </div>
-        <div class="meta-secao">
-          <h3>3. Motor de Categorização</h3>
-          <p>A classificação dos itens baseia-se em algoritmo hierárquico de expressões regulares com termos de inclusão e exclusão, aplicado sobre o objeto da proposta e o nome do item de liquidação. As categorias seguem a seguinte hierarquia:</p>
+          <h3>2. Ingestão e Processamento Inicial dos Dados</h3>
+          <p>A ingestão utiliza uma consulta SQL otimizada com junções (JOINs) entre tabelas estruturais (<code>Proposta</code>, <code>Convênio</code>, <code>Pagamento</code>, <code>Itens_DL</code>, etc.) do Siconv.</p>
+          <p><strong>Filtros de Escopo Aplicados na Origem:</strong></p>
           <ul style="font-size:13px;line-height:1.8;">
-            <li><strong>Nível 1:</strong> Projetos, Estudos e Capacitações</li>
-            <li><strong>Nível 2:</strong> Obras Civis e Infraestrutura (Pavimentação, Pontes, Saneamento, Edificações)</li>
-            <li><strong>Nível 3:</strong> Linha Amarela (Máquinas Pesadas) e Caminhões</li>
-            <li><strong>Nível 4:</strong> Tratores e Implementos Agrícolas</li>
-            <li><strong>Nível 5:</strong> Outras Despesas (TI, Deslocamento, Materiais)</li>
+            <li>Restrição ao Órgão Superior <code>53000</code> (Ministério da Integração e do Desenvolvimento Regional).</li>
+            <li>Exclusão de projetos básicos rejeitados e convênios não assinados, rescindidos ou anulados.</li>
+            <li>Foco em UGs específicas da SDR (<code>530023</code>, <code>530020</code>, <code>530036</code>, <code>74019</code>).</li>
+            <li>Seleção estrita de itens de liquidação com valores válidos documentados.</li>
           </ul>
         </div>
         <div class="meta-secao">
-          <h3>4. Estimativa de Quilometragem Pavimentada</h3>
-          <p>Para pavimentação, a área executada (m²) é estimada por rateio proporcional ao valor pago em cada nota fiscal. Registros com custo unitário fora da faixa de R$ 10–R$ 1.500/m² são tratados como outliers e têm sua metragem imputada pela mediana do custo do ano correspondente. A quilometragem equivalente é calculada multiplicando a área estimada por 6.000 m²/km.</p>
+          <h3>3. Tratamento de Variáveis e Limpeza</h3>
+          <p>Os dados passaram por sanitização para viabilizar as regras de negócio:</p>
+          <ul style="font-size:13px;line-height:1.8;">
+            <li>Desmembramento da coluna <code>ACAO_ORCAMENTARIA</code> para isolar o código do Programa.</li>
+            <li>Remoção de caracteres de controle inválidos via Expressões Regulares (Regex).</li>
+            <li>Normalização de textos textuais (conversão para minúsculas e remoção de acentos) no objeto da proposta, nome do item e descrição do item do documento de liquidação.</li>
+            <li>Correção de tipagem e substituição de separadores decimais nas colunas financeiras.</li>
+          </ul>
         </div>
         <div class="meta-secao">
-          <h3>5. Origem dos Recursos (Resultado Primário)</h3>
+          <h3>4. Motor de Categorização (Regex e Regras de Negócio)</h3>
+          <p>A classificação dos itens baseia-se em um algoritmo de Regex hierárquico, contendo termos de inclusão e exclusão (para evitar falsos positivos):</p>
+          <ol style="font-size:13px;line-height:1.8;">
+            <li><strong>Despesas Financeiras:</strong> Isolamento de aditivos e rendimentos.</li>
+            <li><strong>Projetos e Capacitação:</strong> Separação de engenharia consultiva de obras físicas.</li>
+            <li><strong>Obras e Infraestrutura:</strong> Classificação detalhada (Pavimentação, Pontes, Barragens, Edificações, etc.).</li>
+            <li><strong>Máquinas Pesadas e Caminhões:</strong> Subclassificação avançada de frotas (Linha amarela, basculantes, compactadores, pipas).</li>
+            <li><strong>Tratores e Implementos:</strong> Diferenciação entre o maquinário trator e seus implementos secundários.</li>
+            <li><strong>Políticas Regionais (Rotas):</strong> Mapeamento transversal no objeto da proposta para cadeias produtivas (Cacau, Mel, Cordeiro, Açaí, TIC, etc.).</li>
+          </ol>
+          <p><em>Nota de Correção: Equipamentos com preenchimento inconsistente de quantidade no documento de liquidação (menor que 1 ou maior que 100) tiveram seu valor unitário forçado para 1 para evitar distorções de contagem.</em></p>
+        </div>
+        <div class="meta-secao">
+          <h3>5. Extração de Métricas Físicas Brutas (Obras em M²)</h3>
+          <p>Para recuperar as dimensões físicas das obras (m²), construiu-se uma CTE (Common Table Expression) específica:</p>
+          <ul style="font-size:13px;line-height:1.8;">
+            <li>O uso de funções de janela (<code>DENSE_RANK()</code>) garantiu a extração exclusiva da meta associada à <strong>versão mais recente e validada</strong> do Projeto Básico.</li>
+            <li>Aplicou-se a condição de existência (<code>EXISTS</code>) para garantir que apenas convênios com pagamentos reais transitassem para a base de métricas.</li>
+            <li>O valor da metragem extraída (<code>QUANTIDADE_M2</code>) foi isolado por convênio e filtrado apenas para obras medidas estritamente em "M2".</li>
+          </ul>
+        </div>
+        <div class="meta-secao">
+          <h3>6. Identificação de Outliers e Higienização do Custo por M²</h3>
+          <p>Uma vez que os dados do Siconv dependem de preenchimento humano, a metragem informada (<code>MAX_QUANTIDADE_M2</code>) apresentou inconsistências graves. Para mitigar isso, implementou-se uma regra de detecção de <em>outliers</em> baseada no custo paramétrico da obra.</p>
+          <ol style="font-size:13px;line-height:1.8;">
+            <li><strong>Cálculo do Custo Bruto:</strong> O custo desembolsado por metro quadrado foi calculado pela razão entre o Valor Desembolsado do Convênio e a Metragem Máxima informada.</li>
+            <li><strong>Corte por Limites de Domínio:</strong> O método estatístico padrão de Intervalo Interquartil (IQR) foi descartado por gerar limite inferior negativo. Em seu lugar, adotou-se um corte baseado na realidade de mercado da construção civil brasileira (CBUQ, Paver, Tratamentos a Frio).</li>
+            <li><strong>Limites Aplicados:</strong> Valores de custo unitário abaixo de <strong>R$ 10,00/m²</strong> ou acima de <strong>R$ 1.500,00/m²</strong> foram classificados como anomalias.</li>
+            <li><strong>Tratamento:</strong> Registros fora dessa banda de plausibilidade tiveram sua quantidade original de M² anulada (NaN), preparando o terreno para a imputação algorítmica.</li>
+          </ol>
+        </div>
+        <div class="meta-secao">
+          <h3>7. Modelagem e Estimativa Avançada de Área Pavimentada</h3>
+          <p>Para lidar com a granularidade dos pagamentos (diversas notas fiscais em anos diferentes para a mesma obra) e com os dados anulados no passo anterior, desenvolveu-se um modelo de estimativa de área executada.</p>
+          <p><strong>7.1. Cálculo do Custo por M² Ponderado</strong></p>
+          <p>Para os convênios com metragem válida, o valor real do M² foi calculado levando em conta o grau de conclusão financeira da obra e o peso daquele pagamento específico no todo:</p>
+          <p style="font-family:monospace;background:#f7f9fc;padding:10px;border-radius:6px;font-size:12px;">
+            Custo_m² = Valor Agregado ÷ [ (Valor Agregado ÷ Soma Valor Agregado) × (Valor Desembolsado Conv ÷ Valor Repasse Conv) × Max Quantidade M² ]
+          </p>
+          <p>A partir dessa fórmula, extraiu-se a <strong>mediana do custo por metro quadrado para cada ano de pagamento</strong> (<code>MEDIANA_CUSTO_M2</code>), criando um referencial de mercado ajustado à inflação de cada período.</p>
+          <p><strong>7.2. Imputação e Estimativa Final (M2_estimado) por ano</strong></p>
+          <p>A consolidação da área pavimentada por pagamento obedeceu a uma lógica condicional bipartida:</p>
+          <ul style="font-size:13px;line-height:1.8;">
+            <li><strong>Cenário A (Dados Válidos):</strong> Se o convênio possui metragem confiável, a área executada na nota fiscal foi calculada rateando a metragem total pela fração financeira do pagamento: M²_Estimado = (Valor Agregado ÷ Soma Valor Agregado) × Quantidade M²</li>
+            <li><strong>Cenário B (Dados Ausentes ou Outliers):</strong> Se a metragem original foi reprovada nos limites de R$ 10 – R$ 1.500, a área foi matematicamente imputada dividindo o valor daquele pagamento específico pela mediana do custo do ano correspondente: M²Estimado = Valor Agregado ÷ Mediana Custo M²</li>
+          </ul>
+        </div>
+        <div class="meta-secao">
+          <h3>8. Limitações</h3>
+          <p>As classificações podem conter erros devido à falta de informação ou informação incerta ou ambígua no objeto da proposta, nome ou descrição dos itens no documento de liquidação, como Nota Fiscal. A execução per capita utiliza a população do Censo 2022 (IBGE) como denominador fixo.</p>
+        </div>
+        <div class="meta-secao">
+          <h3>9. Origem dos Recursos (Resultado Primário)</h3>
           <table style="width:100%;font-size:12.5px;">
             <thead><tr><th>Código</th><th>Descrição</th></tr></thead>
             <tbody>
@@ -456,11 +510,7 @@ tr.total-row td{font-weight:700;background:#eef2f9;border-top:2px solid var(--pr
           </table>
         </div>
         <div class="meta-secao">
-          <h3>6. Limitações</h3>
-          <p>As classificações podem conter erros devido à falta de informação ou informação incerta no objeto da proposta, nome ou descrição dos itens no documento de liquidação. A execução per capita utiliza a população do Censo 2022 (IBGE) como denominador fixo.</p>
-        </div>
-        <div class="meta-secao">
-          <h3>7. Fonte dos Dados</h3>
+          <h3>10. Fonte dos Dados</h3>
           <p><strong>Transferegov.br</strong> — Convênios, Contratos de Repasse e Termos de Fomento<br>
           <strong>IBGE</strong> — Censo Demográfico 2022 (população municipal)<br>
           <strong>PNDR</strong> — Tipologia dos municípios (Política Nacional de Desenvolvimento Regional)</p>
@@ -479,7 +529,7 @@ tr.total-row td{font-weight:700;background:#eef2f9;border-top:2px solid var(--pr
 // ============================================================
 // CONFIGURAÇÃO — URLs dos dados no GitHub Pages
 // ============================================================
-const BASE_URL = 'https://dginf.github.io/entregas/';
+const BASE_URL = './';
 const URLS = {
   agregado: BASE_URL + 'data/agregado.json',
   aexecutar: BASE_URL + 'data/a_executar.json',
