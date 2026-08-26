@@ -960,7 +960,7 @@ function renderMapa(agr) {
 
   if (mapInstance) { mapInstance.remove(); mapInstance = null; }
   mapInstance = L.map('map-percapita', { zoomControl: true }).setView([-14, -51], 4);
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', { attribution: '© OpenStreetMap © CARTO' }).addTo(mapInstance);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors', maxZoom: 19 }).addTo(mapInstance);
 
   // Mapear cod6 → dados
   const cod6Map = {};
