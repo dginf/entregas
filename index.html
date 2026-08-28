@@ -690,7 +690,9 @@ function filtrarAExecutar() {
     if (FILTROS.anoFim && r.ANO_Convenio > +FILTROS.anoFim) return false;
     if (FILTROS.programa && r.PROGRAMA !== FILTROS.programa) return false;
     if (FILTROS.acao && r.ACAO !== FILTROS.acao) return false;
+    if (FILTROS.origem && r.ORIGEM_RECURSO !== FILTROS.origem) return false;
     if (FILTROS.instrumento && r.INSTRUMENTO_ATIVO !== FILTROS.instrumento) return false;
+    if (FILTROS.situacoes.size > 0 && !FILTROS.situacoes.has(r.SIT_CONVENIO)) return false;
     const mun = DATA.municipios[r.COD_MUNIC_IBGE] || {};
     if (FILTROS.regiao && mun.nome_regiao !== FILTROS.regiao) return false;
     if (FILTROS.uf && mun.sigla_uf !== FILTROS.uf) return false;
