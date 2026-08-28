@@ -1,0 +1,1364 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Painel de Entregas da SDR</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap');
+:root{
+  --primary:#1351b4;--primary-dark:#0c326f;--secondary:#009C3B;
+  --bg-page:#E8E8E8;--card:#fff;--ink:#232323;--ink-soft:#666;
+  --line:#e0e0e0;--green:#009C3B;--amber:#b6790a;--red:#c62828;
+  --shadow:0 2px 8px rgba(0,0,0,.10);
+}
+*{box-sizing:border-box;}
+body{margin:0;background:var(--bg-page);color:var(--ink);font-family:'Roboto',Arial,sans-serif;font-size:14px;}
+
+/* HEADER */
+header.topbar{padding:18px 28px 0;max-width:1500px;margin:0 auto;}
+.dash-header{background:var(--card);border-radius:8px;padding:20px 28px;margin-bottom:14px;box-shadow:var(--shadow);
+  display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:12px;}
+.dash-header-left h1{font-size:28px;font-weight:700;margin:0 0 4px;color:var(--primary);}
+.dash-header-left p{font-size:13px;color:var(--ink-soft);margin:0;}
+.data-carga{font-size:11px;background:#eef2f9;border-left:3px solid var(--primary);padding:6px 10px;border-radius:4px;color:var(--primary-dark);}
+
+/* NAV */
+nav.topnav{display:flex;gap:6px;flex-wrap:wrap;max-width:1500px;margin:0 auto 14px;padding:0 28px;}
+nav.topnav a{color:var(--ink-soft);text-decoration:none;font-size:13px;font-weight:500;padding:9px 16px;border-radius:6px;cursor:pointer;background:var(--card);box-shadow:var(--shadow);transition:all .15s;}
+nav.topnav a.active{color:#fff;background:var(--primary);}
+nav.topnav a:hover:not(.active){background:#eef2f9;color:var(--primary);}
+
+/* LAYOUT */
+.layout{display:flex;align-items:flex-start;gap:16px;padding:0 28px 60px;max-width:1500px;margin:0 auto;}
+.sidebar{width:280px;flex:0 0 280px;background:var(--card);border-radius:8px;padding:18px;box-shadow:var(--shadow);position:sticky;top:14px;max-height:calc(100vh - 28px);overflow-y:auto;}
+.sidebar h3{font-size:12px;margin:0 0 12px;color:var(--ink);text-transform:uppercase;letter-spacing:.05em;font-weight:700;border-bottom:2px solid var(--primary);padding-bottom:6px;}
+.group{margin-bottom:12px;}
+.group-label{font-size:11px;font-weight:600;letter-spacing:.05em;color:var(--ink-soft);text-transform:uppercase;margin-bottom:5px;}
+select,input[type=text]{width:100%;padding:7px 9px;border:1px solid var(--line);border-radius:6px;font-size:12px;color:var(--ink);background:#fff;font-family:inherit;}
+select:focus{outline:2px solid #cfe0f7;border-color:var(--primary);}
+.divider{height:1px;background:var(--line);margin:12px 0;}
+.sidebar-section{border-left:3px solid var(--secondary);background:#f4faf6;border-radius:6px;padding:10px 10px 4px;margin-bottom:12px;}
+.sidebar-section .group-label{color:var(--secondary);}
+.flag-row{display:flex;align-items:center;justify-content:space-between;padding:4px 0;font-size:12px;}
+.seg{display:flex;border:1px solid var(--line);border-radius:6px;overflow:hidden;}
+.seg button{border:none;background:#fff;font-size:10px;padding:3px 7px;color:var(--ink-soft);cursor:pointer;font-family:inherit;}
+.seg button.on{background:var(--secondary);color:#fff;}
+.seg button+button{border-left:1px solid var(--line);}
+.btn-reset{width:100%;padding:8px;background:#f5f5f5;border:1px solid var(--line);border-radius:6px;font-size:12px;cursor:pointer;color:var(--ink-soft);font-family:inherit;margin-top:8px;}
+.btn-reset:hover{background:#eee;}
+
+
+.sidebar-group-title{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--primary);margin:10px 0 6px;padding-bottom:4px;border-bottom:1px solid #d0dff7;}
+/* MAIN */
+.main{flex:1;min-width:0;}
+.view{display:none;}
+.view.active{display:block;}
+
+/* KPI */
+.kpi-row{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:16px;}
+.kpi{background:var(--card);border-radius:8px;padding:12px 14px;border-left:4px solid var(--primary);box-shadow:var(--shadow);}
+.kpi .kl{font-size:10px;font-weight:700;text-transform:uppercase;color:var(--ink-soft);margin-bottom:4px;letter-spacing:.04em;}
+.kpi .kv{font-size:17px;font-weight:700;color:var(--primary);}
+.kpi .ks{font-size:11px;color:var(--ink-soft);margin-top:2px;}
+
+/* CARD */
+.card{background:var(--card);border-radius:8px;padding:18px 20px;margin-bottom:14px;box-shadow:var(--shadow);}
+.card-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;}
+.card h2{font-size:15px;font-weight:700;color:var(--ink);margin:0;}
+.card .desc{font-size:12px;color:var(--ink-soft);margin:2px 0 12px;}
+.btn-xlsx{font-size:11px;color:var(--primary);cursor:pointer;font-weight:600;border:1px solid var(--primary);padding:4px 10px;border-radius:5px;background:#fff;}
+.btn-xlsx:hover{background:#eef2f9;}
+.chartwrap{height:280px;}
+.chartwrap-lg{height:380px;}
+
+/* TABELA */
+.tbl-wrap{overflow-x:auto;}
+table{width:100%;border-collapse:collapse;font-size:12px;}
+th{text-align:left;color:var(--ink-soft);font-weight:700;font-size:10.5px;text-transform:uppercase;padding:8px 10px;border-bottom:2px solid var(--primary);background:#f7f9fc;}
+td{padding:7px 10px;border-bottom:1px solid #f1f2f5;}
+tr:hover td{background:#f7f9fc;}
+td.num{text-align:right;font-variant-numeric:tabular-nums;}
+th.num{text-align:right;}
+tr.total-row td{font-weight:700;background:#eef2f9;border-top:2px solid var(--primary);}
+.badge-div{display:inline-block;padding:2px 8px;border-radius:12px;font-size:10px;font-weight:700;}
+.bd-obras{background:#dbeafe;color:#1e40af;}
+.bd-equip{background:#dcfce7;color:#166534;}
+.bd-cap{background:#fef3c7;color:#92400e;}
+.bd-proj{background:#f3e8ff;color:#6b21a8;}
+.bd-outros{background:#f1f5f9;color:#475569;}
+
+/* MAPA */
+#map-percapita{height:480px;border-radius:8px;}
+.legend{background:#fff;padding:10px 14px;border-radius:8px;box-shadow:var(--shadow);font-size:11.5px;line-height:2;}
+.legend i{width:12px;height:12px;display:inline-block;border-radius:2px;margin-right:6px;vertical-align:middle;}
+
+/* METRICA SELETOR */
+.metric-tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px;}
+.metric-tab{padding:6px 14px;border-radius:20px;font-size:12px;font-weight:500;cursor:pointer;border:1px solid var(--line);background:#fff;color:var(--ink-soft);}
+.metric-tab.active{background:var(--primary);color:#fff;border-color:var(--primary);}
+
+/* A EXECUTAR */
+.exec-bar-wrap{display:flex;align-items:center;gap:8px;font-size:12px;}
+.exec-bar{height:8px;border-radius:4px;background:var(--primary);flex-shrink:0;}
+.exec-bar-bg{height:8px;border-radius:4px;background:#e0e0e0;flex:1;overflow:hidden;}
+.exec-perc{font-size:11px;color:var(--ink-soft);white-space:nowrap;}
+
+/* RODAPÉ */
+.rodape{text-align:center;padding:24px;color:var(--ink-soft);font-size:12px;border-top:1px solid var(--line);max-width:1500px;margin:0 auto;}
+
+/* METODOLOGIA */
+.meta-secao{margin-bottom:20px;}
+.meta-secao h3{font-size:15px;color:var(--primary);margin:0 0 8px;font-weight:700;}
+.meta-secao p{line-height:1.7;color:var(--ink);font-size:13px;margin:0 0 8px;}
+.meta-secao table td{font-size:12.5px;vertical-align:top;}
+
+/* LOADING */
+#loading{position:fixed;inset:0;background:rgba(255,255,255,.9);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:9999;}
+.spinner{width:40px;height:40px;border:4px solid var(--line);border-top-color:var(--primary);border-radius:50%;animation:spin .8s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg)}}
+#loading p{margin-top:14px;color:var(--ink-soft);font-size:13px;}
+
+@media(max-width:900px){
+  .layout{flex-direction:column;}
+  .sidebar{width:100%;position:relative;top:0;max-height:none;}
+  .kpi-row{grid-template-columns:repeat(2,1fr);}
+}
+</style>
+</head>
+<body>
+
+<div id="loading"><div class="spinner"></div><p>Carregando dados...</p></div>
+
+<header class="topbar">
+  <div class="dash-header">
+    <div class="dash-header-left">
+      <h1>Painel de Entregas da SDR</h1>
+      <p>Ministério da Integração e do Desenvolvimento Regional (MIDR/SDR) · Convênios e Transferências Voluntárias</p>
+    </div>
+    <div class="data-carga" id="data-carga-label">📅 Carregando...</div>
+  </div>
+</header>
+
+<nav class="topnav">
+  <a data-view="visao-geral" class="active">Visão Geral</a>
+  <a data-view="entregas">Entregas</a>
+  <a data-view="mapa">Mapa</a>
+  <a data-view="a-executar">A Executar</a>
+  <a data-view="municipal">Municipal</a>
+  <a data-view="metodologia">Metodologia</a>
+</nav>
+
+<div class="layout">
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <h3>🔍 Filtros</h3>
+
+    <div class="sidebar-group-title">Filtros Globais</div>
+    <div class="group">
+      <div class="group-label">Período (Ano de Pagamento)</div>
+      <select id="f-ano-ini"><option value="">De...</option></select>
+      <div style="margin:4px 0"></div>
+      <select id="f-ano-fim"><option value="">Até...</option></select>
+    </div>
+    <div class="group">
+      <div class="group-label">Região</div>
+      <select id="f-regiao"><option value="">Todas</option></select>
+    </div>
+    <div class="group">
+      <div class="group-label">Estado (UF)</div>
+      <select id="f-uf"><option value="">Todos</option></select>
+    </div>
+    <div class="group">
+      <div class="group-label">Tipologia PNDR 3</div>
+      <select id="f-tipologia"><option value="">Todas</option></select>
+    </div>
+
+    <div class="divider"></div>
+    <div class="sidebar-group-title">Orçamento</div>
+    <div class="group">
+      <div class="group-label">Programa</div>
+      <select id="f-programa"><option value="">Todos</option></select>
+    </div>
+    <div class="group">
+      <div class="group-label">Ação</div>
+      <select id="f-acao"><option value="">Todas</option></select>
+    </div>
+    <div class="group">
+      <div class="group-label">Origem dos Recursos</div>
+      <select id="f-origem"><option value="">Todas</option></select>
+    </div>
+
+    <div class="divider"></div>
+    <div class="sidebar-group-title">Abrangência Territorial</div>
+    <div class="group">
+      <div style="font-size:11.5px;line-height:2;">
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;"><input type="checkbox" id="f-flag-amazonia_legal" onchange="setFlag('amazonia_legal',this.checked?'1':'')" style="accent-color:var(--secondary);"> Amazônia Legal</label>
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;"><input type="checkbox" id="f-flag-SUDAM" onchange="setFlag('SUDAM',this.checked?'1':'')" style="accent-color:var(--secondary);"> SUDAM</label>
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;"><input type="checkbox" id="f-flag-SUDECO" onchange="setFlag('SUDECO',this.checked?'1':'')" style="accent-color:var(--secondary);"> SUDECO</label>
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;"><input type="checkbox" id="f-flag-SUDENE" onchange="setFlag('SUDENE',this.checked?'1':'')" style="accent-color:var(--secondary);"> SUDENE</label>
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;"><input type="checkbox" id="f-flag-semiarido" onchange="setFlag('semiarido',this.checked?'1':'')" style="accent-color:var(--secondary);"> Semiárido</label>
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;"><input type="checkbox" id="f-flag-faixa_fronteira" onchange="setFlag('faixa_fronteira',this.checked?'1':'')" style="accent-color:var(--secondary);"> Faixa de Fronteira</label>
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;"><input type="checkbox" id="f-flag-matopiba" onchange="setFlag('matopiba',this.checked?'1':'')" style="accent-color:var(--secondary);"> MATOPIBA</label>
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;"><input type="checkbox" id="f-flag-cidades_intermediadoras" onchange="setFlag('cidades_intermediadoras',this.checked?'1':'')" style="accent-color:var(--secondary);"> Cidades Intermediadoras</label>
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;"><input type="checkbox" id="f-flag-amazonia_azul" onchange="setFlag('amazonia_azul',this.checked?'1':'')" style="accent-color:var(--secondary);"> Amazônia Azul</label>
+      </div>
+    </div>
+
+    <div class="sidebar-group-title" style="margin-top:4px;">Rotas de Integração</div>
+    <div class="group">
+      <select id="f-rota">
+        <option value="">Todas</option>
+        <option value="R_ACAI">Rota Açaí</option>
+        <option value="R_BIO">Rota Bio</option>
+        <option value="R_CACAU">Rota Cacau</option>
+        <option value="R_CORDEIRO">Rota Cordeiro</option>
+        <option value="R_ECO_CIR">Rota Eco Cir</option>
+        <option value="R_FRUTI">Rota Fruti</option>
+        <option value="R_LEITE">Rota Leite</option>
+        <option value="R_MEL">Rota Mel</option>
+        <option value="R_TIC">Rota Tic</option>
+        <option value="R_PESCADO">Rota Pescado</option>
+        <option value="R_MODA">Rota Moda</option>
+        <option value="R_AVICULTURA">Rota Avicultura</option>
+        <option value="R_MANDIOCULTURA">Rota Mandiocultura</option>
+      </select>
+    </div>
+
+    <div class="divider"></div>
+    <div class="sidebar-group-title">Instrumento</div>
+    <div class="group">
+      <div class="group-label">Instrumento Ativo</div>
+      <div class="seg" style="width:100%;">
+        <button class="on" id="btn-inst-todos" onclick="setInstrumento('')">Todos</button>
+        <button id="btn-inst-sim" onclick="setInstrumento('SIM')">Sim</button>
+        <button id="btn-inst-nao" onclick="setInstrumento('NAO')">Não</button>
+      </div>
+    </div>
+
+    <button class="btn-reset" onclick="resetFiltros()">↺ Limpar filtros</button>
+  </aside>
+
+  <!-- MAIN -->
+  <main class="main">
+
+    <!-- VISÃO GERAL -->
+    <div class="view active" id="view-visao-geral">
+      <div class="kpi-row" id="kpi-row"></div>
+      <div class="card">
+        <div class="card-header">
+          <h2>Evolução por Ano de Pagamento</h2>
+          <button class="btn-xlsx" onclick="exportChart('chart-evolucao','Evolucao_Anual')">⬇ XLSX</button>
+        </div>
+        <div class="chartwrap"><canvas id="chart-evolucao"></canvas></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+        <div class="card">
+          <h2>Por Região</h2>
+          <div class="chartwrap"><canvas id="chart-regiao"></canvas></div>
+        </div>
+        <div class="card">
+          <h2>Por Divisão</h2>
+          <div class="chartwrap"><canvas id="chart-divisao"></canvas></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ENTREGAS -->
+    <div class="view" id="view-entregas">
+      <div class="card" style="margin-bottom:14px;">
+        <div style="display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap;">
+          <div style="flex:0 0 200px;">
+            <div class="group-label">Métrica</div>
+            <select id="f-metrica" style="width:100%;">
+              <option value="VALOR_AGREGADO">Valor Executado (R$)</option>
+              <option value="QTD_AGREGADA">Quantidade</option>
+              <option value="KM_estimado">KMs Estimados</option>
+            </select>
+          </div>
+          <div style="flex:1;min-width:300px;">
+            <div class="group-label">Situação do Convênio</div>
+            <div id="f-situacao-checks" style="
+              display:grid;
+              grid-template-columns:repeat(3,1fr);
+              gap:2px 12px;
+              padding:6px 0;
+              font-size:11.5px;
+            "></div>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <h2>Entregas por Categoria</h2>
+          <button class="btn-xlsx" onclick="exportTable('tbl-categorias','Entregas_Categoria')">⬇ XLSX</button>
+        </div>
+        <p class="desc">Categorização dos itens de liquidação por tipo de entrega física</p>
+        <div class="tbl-wrap"><table id="tbl-categorias"><thead></thead><tbody></tbody></table></div>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <h2>Resumo por Município</h2>
+          <button class="btn-xlsx" onclick="exportTable('tbl-municipios','Entregas_Municipio')">⬇ XLSX</button>
+        </div>
+        <div class="tbl-wrap"><table id="tbl-municipios"><thead></thead><tbody></tbody></table></div>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <h2>Por Tipologia PNDR 3</h2>
+          <button class="btn-xlsx" onclick="exportTable('tbl-tipologia','Entregas_Tipologia')">⬇ XLSX</button>
+        </div>
+        <div class="tbl-wrap"><table id="tbl-tipologia"><thead></thead><tbody></tbody></table></div>
+      </div>
+    </div>
+
+    <!-- MAPA -->
+    <div class="view" id="view-mapa">
+      <div class="card">
+        <h2>Execução per capita por Município</h2>
+        <p class="desc">Valor executado dividido pela população do município (Censo 2022)</p>
+        <div id="map-percapita"></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+        <div class="card">
+          <h2>Top 10 Municípios — Per capita</h2>
+          <div class="chartwrap"><canvas id="chart-top10"></canvas></div>
+        </div>
+        <div class="card">
+          <h2>Per capita por Região</h2>
+          <div class="chartwrap"><canvas id="chart-regiao-pc"></canvas></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <h2>Per capita por Estado (UF)</h2>
+          <button class="btn-xlsx" onclick="exportTable('tbl-pc-uf','Percapita_UF')">⬇ XLSX</button>
+        </div>
+        <div class="tbl-wrap"><table id="tbl-pc-uf"><thead></thead><tbody></tbody></table></div>
+      </div>
+    </div>
+
+    <!-- A EXECUTAR -->
+    <div class="view" id="view-a-executar">
+      <div class="kpi-row" id="kpi-aexecutar"></div>
+      <div class="card">
+        <div class="card-header">
+          <h2>Saldo a Executar por Região</h2>
+          <button class="btn-xlsx" onclick="exportTable('tbl-aexec-regiao','AExecutar_Regiao')">⬇ XLSX</button>
+        </div>
+        <div class="tbl-wrap"><table id="tbl-aexec-regiao"><thead></thead><tbody></tbody></table></div>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <h2>Saldo a Executar por UF</h2>
+          <button class="btn-xlsx" onclick="exportTable('tbl-aexec-uf','AExecutar_UF')">⬇ XLSX</button>
+        </div>
+        <div class="tbl-wrap"><table id="tbl-aexec-uf"><thead></thead><tbody></tbody></table></div>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <h2>Convênios por Situação</h2>
+          <button class="btn-xlsx" onclick="exportTable('tbl-aexec-sit','AExecutar_Situacao')">⬇ XLSX</button>
+        </div>
+        <div class="tbl-wrap"><table id="tbl-aexec-sit"><thead></thead><tbody></tbody></table></div>
+      </div>
+    </div>
+
+    <!-- MUNICIPAL -->
+    <div class="view" id="view-municipal">
+      <div class="card" style="margin-bottom:14px;">
+        <h2>Buscar Município</h2>
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+          <input type="text" id="f-mun-busca" placeholder="Digite o nome do município..." style="flex:1;min-width:200px;" oninput="filtrarMunicipiosBusca()">
+          <select id="f-mun-uf-sel" onchange="filtrarMunicipiosBusca()" style="width:80px;">
+            <option value="">UF</option>
+          </select>
+          <select id="f-mun-sel" onchange="selecionarMunicipio()" style="flex:2;min-width:200px;">
+            <option value="">Selecione o município...</option>
+          </select>
+        </div>
+      </div>
+      <div id="mun-conteudo" style="display:none;">
+        <div class="kpi-row" id="kpi-municipal"></div>
+        <div class="card">
+          <div class="card-header">
+            <h2 id="mun-titulo">Município</h2>
+            <button class="btn-xlsx" onclick="exportTable('tbl-mun-cat','Municipal_Categorias')">⬇ XLSX</button>
+          </div>
+          <p class="desc" id="mun-desc"></p>
+          <div class="tbl-wrap"><table id="tbl-mun-cat"><thead></thead><tbody></tbody></table></div>
+        </div>
+        <div class="card">
+          <div class="card-header">
+            <h2>Evolução Anual</h2>
+          </div>
+          <div class="chartwrap"><canvas id="chart-mun-evolucao"></canvas></div>
+        </div>
+        <div class="card">
+          <div class="card-header">
+            <h2>Convênios</h2>
+            <button class="btn-xlsx" onclick="exportTable('tbl-mun-conv','Municipal_Convenios')">⬇ XLSX</button>
+          </div>
+          <div class="tbl-wrap"><table id="tbl-mun-conv"><thead></thead><tbody></tbody></table></div>
+        </div>
+      </div>
+      <div id="mun-placeholder" class="card" style="text-align:center;color:var(--ink-soft);padding:40px;">
+        <p style="font-size:18px;">🏙️</p>
+        <p>Selecione um município para ver os detalhes</p>
+      </div>
+    </div>
+
+    <!-- METODOLOGIA -->
+    <div class="view" id="view-metodologia">
+      <div class="card">
+        <h2>Relatório Metodológico</h2>
+        <p class="desc">Consolidação e Estimativa de Entregas da SDR (Siconv/Transferegov)</p>
+        <div class="meta-secao">
+          <h3>1. Introdução</h3>
+          <p>Este relatório descreve o fluxo metodológico do script de processamento de dados desenvolvido para extrair, categorizar e agregar dados brutos do Siconv. O pipeline gera tabelas consolidadas com foco nas entregas da Secretaria de Desenvolvimento Regional (SDR), com destaque para a nova etapa de higienização de métricas físicas e estimativa avançada de área pavimentada (em m²), posteriormente convertida para Km por meio da multiplicação por 6 mil.</p>
+        </div>
+        <div class="meta-secao">
+          <h3>2. Ingestão e Processamento Inicial dos Dados</h3>
+          <p>A ingestão utiliza uma consulta SQL otimizada com junções (JOINs) entre tabelas estruturais (<code>Proposta</code>, <code>Convênio</code>, <code>Pagamento</code>, <code>Itens_DL</code>, etc.) do Siconv.</p>
+          <p><strong>Filtros de Escopo Aplicados na Origem:</strong></p>
+          <ul style="font-size:13px;line-height:1.8;">
+            <li>Restrição ao Órgão Superior <code>53000</code> (Ministério da Integração e do Desenvolvimento Regional).</li>
+            <li>Exclusão de projetos básicos rejeitados e convênios não assinados, rescindidos ou anulados.</li>
+            <li>Foco em UGs específicas da SDR (<code>530023</code>, <code>530020</code>, <code>530036</code>, <code>74019</code>).</li>
+            <li>Seleção estrita de itens de liquidação com valores válidos documentados.</li>
+          </ul>
+        </div>
+        <div class="meta-secao">
+          <h3>3. Tratamento de Variáveis e Limpeza</h3>
+          <p>Os dados passaram por sanitização para viabilizar as regras de negócio:</p>
+          <ul style="font-size:13px;line-height:1.8;">
+            <li>Desmembramento da coluna <code>ACAO_ORCAMENTARIA</code> para isolar o código do Programa.</li>
+            <li>Remoção de caracteres de controle inválidos via Expressões Regulares (Regex).</li>
+            <li>Normalização de textos textuais (conversão para minúsculas e remoção de acentos) no objeto da proposta, nome do item e descrição do item do documento de liquidação.</li>
+            <li>Correção de tipagem e substituição de separadores decimais nas colunas financeiras.</li>
+          </ul>
+        </div>
+        <div class="meta-secao">
+          <h3>4. Motor de Categorização (Regex e Regras de Negócio)</h3>
+          <p>A classificação dos itens baseia-se em um algoritmo de Regex hierárquico, contendo termos de inclusão e exclusão (para evitar falsos positivos):</p>
+          <ol style="font-size:13px;line-height:1.8;">
+            <li><strong>Despesas Financeiras:</strong> Isolamento de aditivos e rendimentos.</li>
+            <li><strong>Projetos e Capacitação:</strong> Separação de engenharia consultiva de obras físicas.</li>
+            <li><strong>Obras e Infraestrutura:</strong> Classificação detalhada (Pavimentação, Pontes, Barragens, Edificações, etc.).</li>
+            <li><strong>Máquinas Pesadas e Caminhões:</strong> Subclassificação avançada de frotas (Linha amarela, basculantes, compactadores, pipas).</li>
+            <li><strong>Tratores e Implementos:</strong> Diferenciação entre o maquinário trator e seus implementos secundários.</li>
+            <li><strong>Políticas Regionais (Rotas):</strong> Mapeamento transversal no objeto da proposta para cadeias produtivas (Cacau, Mel, Cordeiro, Açaí, TIC, etc.).</li>
+          </ol>
+          <p><em>Nota de Correção: Equipamentos com preenchimento inconsistente de quantidade no documento de liquidação (menor que 1 ou maior que 100) tiveram seu valor unitário forçado para 1 para evitar distorções de contagem.</em></p>
+        </div>
+        <div class="meta-secao">
+          <h3>5. Extração de Métricas Físicas Brutas (Obras em M²)</h3>
+          <p>Para recuperar as dimensões físicas das obras (m²), construiu-se uma CTE (Common Table Expression) específica:</p>
+          <ul style="font-size:13px;line-height:1.8;">
+            <li>O uso de funções de janela (<code>DENSE_RANK()</code>) garantiu a extração exclusiva da meta associada à <strong>versão mais recente e validada</strong> do Projeto Básico.</li>
+            <li>Aplicou-se a condição de existência (<code>EXISTS</code>) para garantir que apenas convênios com pagamentos reais transitassem para a base de métricas.</li>
+            <li>O valor da metragem extraída (<code>QUANTIDADE_M2</code>) foi isolado por convênio e filtrado apenas para obras medidas estritamente em "M2".</li>
+          </ul>
+        </div>
+        <div class="meta-secao">
+          <h3>6. Identificação de Outliers e Higienização do Custo por M²</h3>
+          <p>Uma vez que os dados do Siconv dependem de preenchimento humano, a metragem informada (<code>MAX_QUANTIDADE_M2</code>) apresentou inconsistências graves. Para mitigar isso, implementou-se uma regra de detecção de <em>outliers</em> baseada no custo paramétrico da obra.</p>
+          <ol style="font-size:13px;line-height:1.8;">
+            <li><strong>Cálculo do Custo Bruto:</strong> O custo desembolsado por metro quadrado foi calculado pela razão entre o Valor Desembolsado do Convênio e a Metragem Máxima informada.</li>
+            <li><strong>Corte por Limites de Domínio:</strong> O método estatístico padrão de Intervalo Interquartil (IQR) foi descartado por gerar limite inferior negativo. Em seu lugar, adotou-se um corte baseado na realidade de mercado da construção civil brasileira (CBUQ, Paver, Tratamentos a Frio).</li>
+            <li><strong>Limites Aplicados:</strong> Valores de custo unitário abaixo de <strong>R$ 10,00/m²</strong> ou acima de <strong>R$ 1.500,00/m²</strong> foram classificados como anomalias.</li>
+            <li><strong>Tratamento:</strong> Registros fora dessa banda de plausibilidade tiveram sua quantidade original de M² anulada (NaN), preparando o terreno para a imputação algorítmica.</li>
+          </ol>
+        </div>
+        <div class="meta-secao">
+          <h3>7. Modelagem e Estimativa Avançada de Área Pavimentada</h3>
+          <p>Para lidar com a granularidade dos pagamentos (diversas notas fiscais em anos diferentes para a mesma obra) e com os dados anulados no passo anterior, desenvolveu-se um modelo de estimativa de área executada.</p>
+          <p><strong>7.1. Cálculo do Custo por M² Ponderado</strong></p>
+          <p>Para os convênios com metragem válida, o valor real do M² foi calculado levando em conta o grau de conclusão financeira da obra e o peso daquele pagamento específico no todo:</p>
+          <p style="font-family:monospace;background:#f7f9fc;padding:10px;border-radius:6px;font-size:12px;">
+            Custo_m² = Valor Agregado ÷ [ (Valor Agregado ÷ Soma Valor Agregado) × (Valor Desembolsado Conv ÷ Valor Repasse Conv) × Max Quantidade M² ]
+          </p>
+          <p>A partir dessa fórmula, extraiu-se a <strong>mediana do custo por metro quadrado para cada ano de pagamento</strong> (<code>MEDIANA_CUSTO_M2</code>), criando um referencial de mercado ajustado à inflação de cada período.</p>
+          <p><strong>7.2. Imputação e Estimativa Final (M2_estimado) por ano</strong></p>
+          <p>A consolidação da área pavimentada por pagamento obedeceu a uma lógica condicional bipartida:</p>
+          <ul style="font-size:13px;line-height:1.8;">
+            <li><strong>Cenário A (Dados Válidos):</strong> Se o convênio possui metragem confiável, a área executada na nota fiscal foi calculada rateando a metragem total pela fração financeira do pagamento: M²_Estimado = (Valor Agregado ÷ Soma Valor Agregado) × Quantidade M²</li>
+            <li><strong>Cenário B (Dados Ausentes ou Outliers):</strong> Se a metragem original foi reprovada nos limites de R$ 10 – R$ 1.500, a área foi matematicamente imputada dividindo o valor daquele pagamento específico pela mediana do custo do ano correspondente: M²Estimado = Valor Agregado ÷ Mediana Custo M²</li>
+          </ul>
+        </div>
+        <div class="meta-secao">
+          <h3>8. Limitações</h3>
+          <p>As classificações podem conter erros devido à falta de informação ou informação incerta ou ambígua no objeto da proposta, nome ou descrição dos itens no documento de liquidação, como Nota Fiscal. A execução per capita utiliza a população do Censo 2022 (IBGE) como denominador fixo.</p>
+        </div>
+        <div class="meta-secao">
+          <h3>9. Origem dos Recursos (Resultado Primário)</h3>
+          <table style="width:100%;font-size:12.5px;">
+            <thead><tr><th>Código</th><th>Descrição</th></tr></thead>
+            <tbody>
+              <tr><td><strong>RP2</strong></td><td>Dotação discricionária do Poder Executivo</td></tr>
+              <tr><td><strong>RP6</strong></td><td>Emenda Individual Parlamentar</td></tr>
+              <tr><td><strong>RP7</strong></td><td>Emenda de Bancada Estadual</td></tr>
+              <tr><td><strong>RP8</strong></td><td>Emenda de Comissão Parlamentar</td></tr>
+              <tr><td><strong>RP9</strong></td><td>Emenda de Relator-Geral do Orçamento</td></tr>
+              <tr><td><strong>RP2/RP9</strong></td><td>Programa com recursos de ambas as origens</td></tr>
+              <tr><td><strong>Não identificado</strong></td><td>Programas sem código RP explícito no nome</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="meta-secao">
+          <h3>10. Fonte dos Dados</h3>
+          <p><strong>Transferegov.br</strong> — Convênios, Contratos de Repasse e Termos de Fomento<br>
+          <strong>IBGE</strong> — Censo Demográfico 2022 (população municipal)<br>
+          <strong>PNDR</strong> — Tipologia dos municípios (Política Nacional de Desenvolvimento Regional)</p>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<div class="rodape">
+  Painel de Entregas da SDR · Coordenação-Geral de Gestão da Informação (CGGI) · Secretaria de Desenvolvimento Regional (SDR) | Ministério da Integração e do Desenvolvimento Regional
+</div>
+
+<script>
+// ============================================================
+// CONFIGURAÇÃO — URLs dos dados no GitHub Pages
+// ============================================================
+const BASE_URL = './';
+const URLS = {
+  agregado: BASE_URL + 'data/agregado.json',
+  aexecutar: BASE_URL + 'data/a_executar.json',
+  municipios: BASE_URL + 'data/municipios.json',
+  geojson: BASE_URL + 'assets/municipios_br_simpl.geojson'
+};
+
+// ============================================================
+// ESTADO GLOBAL
+// ============================================================
+let DATA = { agregado: [], aexecutar: [], municipios: {}, geojson: null };
+let FILTROS = { anoIni: '', anoFim: '', regiao: '', uf: '', programa: '', acao: '', origem: '', tipologia: '', rota: '', instrumento: '', situacoes: new Set(), flags: {} };
+let charts = {};
+let mapInstance = null;
+
+// ============================================================
+// UTILITÁRIOS
+// ============================================================
+const fmtR = v => v == null || isNaN(v) ? '-' : 'R$ ' + Number(v).toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2});
+const fmtN = v => v == null || isNaN(v) ? '-' : Number(v).toLocaleString('pt-BR', {maximumFractionDigits:1});
+const fmtI = v => v == null || isNaN(v) ? '-' : Number(v).toLocaleString('pt-BR', {maximumFractionDigits:0});
+
+function soma(arr, campo) {
+  return arr.reduce((s, r) => s + (parseFloat(r[campo]) || 0), 0);
+}
+
+function groupBy(arr, campo) {
+  const m = {};
+  arr.forEach(r => {
+    const k = r[campo] || '—';
+    if (!m[k]) m[k] = [];
+    m[k].push(r);
+  });
+  return m;
+}
+
+function destroyChart(id) {
+  if (charts[id]) { charts[id].destroy(); delete charts[id]; }
+}
+
+// ============================================================
+// CARREGAMENTO DOS DADOS
+// ============================================================
+async function carregarDados() {
+  try {
+    const [agr, aex, mun, geo] = await Promise.all([
+      fetch(URLS.agregado).then(r => r.json()),
+      fetch(URLS.aexecutar).then(r => r.json()),
+      fetch(URLS.municipios).then(r => r.json()),
+      fetch(URLS.geojson).then(r => r.json())
+    ]);
+    DATA.agregado = agr;
+    DATA.aexecutar = aex;
+    DATA.municipios = mun; // {COD_MUNIC_IBGE: {nome, sigla_uf, nome_regiao, pop, tipologia, flags...}}
+    DATA.geojson = geo;
+
+    // Adicionar cod6 ao geojson
+    DATA.geojson.features.forEach(f => {
+      if (f.properties.codarea) f.properties.cod6 = f.properties.codarea.slice(0, -1);
+    });
+
+    // Data de carga
+    if (agr.length > 0) {
+      const dc = agr[0].data_carga || '';
+      const partes = dc.substring(0,10).split('-');
+      const dataFormatada = partes[2] + '/' + partes[1] + '/' + partes[0];
+      document.getElementById('data-carga-label').textContent = '📅 Dados: ' + dataFormatada;
+    }
+
+    popularFiltros();
+    document.getElementById('loading').style.display = 'none';
+    renderizar();
+  } catch(e) {
+    document.getElementById('loading').innerHTML = '<p style="color:red">Erro ao carregar dados. Verifique a conexão.</p>';
+    console.error(e);
+  }
+}
+
+// ============================================================
+// POPULAR FILTROS
+// ============================================================
+function popularFiltros() {
+  const agr = DATA.agregado;
+
+  // Anos
+  const anos = [...new Set(agr.map(r => r.ANO_pgto).filter(Boolean))].sort();
+
+  // Situações do convênio
+  const situacoes = [...new Set(DATA.agregado.map(r => r.SIT_CONVENIO).filter(Boolean))].sort();
+  const checksDiv = document.getElementById('f-situacao-checks');
+  checksDiv.innerHTML = situacoes.map(s => `
+    <label style="display:flex;align-items:center;gap:5px;cursor:pointer;white-space:nowrap;overflow:hidden;">
+      <input type="checkbox" value="${s}" onchange="toggleSituacao('${s}',this.checked)" style="accent-color:var(--primary);flex-shrink:0;">
+      <span style="overflow:hidden;text-overflow:ellipsis;" title="${s}">${s}</span>
+    </label>`).join('');
+
+  // UFs para o seletor municipal
+  const ufs = [...new Set(Object.values(DATA.municipios).map(m => m.sigla_uf).filter(Boolean))].sort();
+  document.getElementById('f-mun-uf-sel').innerHTML = '<option value="">UF</option>' + ufs.map(u => `<option>${u}</option>`).join('');
+  filtrarMunicipiosBusca();
+  ['f-ano-ini','f-ano-fim'].forEach(id => {
+    const sel = document.getElementById(id);
+    sel.innerHTML = '<option value="">—</option>' + anos.map(a => `<option>${a}</option>`).join('');
+  });
+  if (anos.length) {
+    document.getElementById('f-ano-ini').value = anos[0];
+    document.getElementById('f-ano-fim').value = anos[anos.length-1];
+    FILTROS.anoIni = String(anos[0]);
+    FILTROS.anoFim = String(anos[anos.length-1]);
+  }
+
+  // Regiões
+  const regioes = [...new Set(Object.values(DATA.municipios).map(m => m.nome_regiao).filter(Boolean))].sort();
+  document.getElementById('f-regiao').innerHTML = '<option value="">Todas</option>' + regioes.map(r => `<option>${r}</option>`).join('');
+
+  // Programas
+  const programas = [...new Set(agr.map(r => r.PROGRAMA).filter(Boolean))].sort();
+  document.getElementById('f-programa').innerHTML = '<option value="">Todos</option>' + programas.map(p => `<option>${p}</option>`).join('');
+
+  // Origens
+  const origens = [...new Set(agr.map(r => r.ORIGEM_RECURSO).filter(Boolean))].sort();
+  document.getElementById('f-origem').innerHTML = '<option value="">Todas</option>' + origens.map(o => `<option>${o}</option>`).join('');
+
+  // Tipologias
+  const tips = [...new Set(Object.values(DATA.municipios).map(m => m.Tipologia_PNDR_3).filter(Boolean))].sort();
+  document.getElementById('f-tipologia').innerHTML = '<option value="">Todas</option>' + tips.map(t => `<option>${t}</option>`).join('');
+}
+
+// ============================================================
+// FILTRAR DADOS
+// ============================================================
+function filtrarAgregado() {
+  return DATA.agregado.filter(r => {
+    if (FILTROS.anoIni && r.ANO_pgto < +FILTROS.anoIni) return false;
+    if (FILTROS.anoFim && r.ANO_pgto > +FILTROS.anoFim) return false;
+    if (FILTROS.programa && r.PROGRAMA !== FILTROS.programa) return false;
+    if (FILTROS.acao && r.ACAO !== FILTROS.acao) return false;
+    if (FILTROS.origem && r.ORIGEM_RECURSO !== FILTROS.origem) return false;
+    const mun = DATA.municipios[r.COD_MUNIC_IBGE] || {};
+    if (FILTROS.regiao && mun.nome_regiao !== FILTROS.regiao) return false;
+    if (FILTROS.uf && mun.sigla_uf !== FILTROS.uf) return false;
+    if (FILTROS.tipologia && mun.Tipologia_PNDR_3 !== FILTROS.tipologia) return false;
+    if (FILTROS.instrumento && r.INSTRUMENTO_ATIVO !== FILTROS.instrumento) return false;
+    if (FILTROS.situacoes.size > 0 && !FILTROS.situacoes.has(r.SIT_CONVENIO)) return false;
+    if (FILTROS.rota && !mun[FILTROS.rota]) return false;
+    for (const [flag, val] of Object.entries(FILTROS.flags)) {
+      if (val === '') continue;
+      if (String(mun[flag] || 0) !== val) return false;
+    }
+    return true;
+  });
+}
+
+function filtrarAExecutar() {
+  return DATA.aexecutar.filter(r => {
+    if (FILTROS.anoIni && r.ANO_Convenio < +FILTROS.anoIni) return false;
+    if (FILTROS.anoFim && r.ANO_Convenio > +FILTROS.anoFim) return false;
+    if (FILTROS.programa && r.PROGRAMA !== FILTROS.programa) return false;
+    if (FILTROS.acao && r.ACAO !== FILTROS.acao) return false;
+    if (FILTROS.instrumento && r.INSTRUMENTO_ATIVO !== FILTROS.instrumento) return false;
+    const mun = DATA.municipios[r.COD_MUNIC_IBGE] || {};
+    if (FILTROS.regiao && mun.nome_regiao !== FILTROS.regiao) return false;
+    if (FILTROS.uf && mun.sigla_uf !== FILTROS.uf) return false;
+    if (FILTROS.tipologia && mun.Tipologia_PNDR_3 !== FILTROS.tipologia) return false;
+    if (FILTROS.rota && !mun[FILTROS.rota]) return false;
+    for (const [flag, val] of Object.entries(FILTROS.flags)) {
+      if (val === '') continue;
+      if (String(mun[flag] || 0) !== val) return false;
+    }
+    return true;
+  });
+}
+
+// ============================================================
+function renderizar() {
+  const view = document.querySelector('.view.active').id.replace('view-','');
+  const agr = filtrarAgregado();
+  const metrica = document.getElementById('f-metrica').value;
+
+  if (view === 'visao-geral') renderVisaoGeral(agr, metrica);
+  else if (view === 'entregas') renderEntregas(agr, metrica);
+  else if (view === 'mapa') renderMapa(agr);
+  else if (view === 'a-executar') renderAExecutar(filtrarAExecutar());
+  else if (view === 'municipal') {
+    const cod = document.getElementById('f-mun-sel').value;
+    if (cod) renderMunicipal(parseInt(cod));
+  }
+}
+
+// ============================================================
+// VISÃO GERAL
+// ============================================================
+function renderVisaoGeral(agr, metrica) {
+  // KPIs
+  const totalVal = soma(agr, 'VALOR_AGREGADO');
+  const totalKm = soma(agr, 'KM_estimado');
+  const munSet = new Set(agr.map(r => r.COD_MUNIC_IBGE).filter(Boolean));
+  const convSet = new Set(agr.map(r => r.NR_CONVENIO).filter(Boolean));
+
+  // KPIs ampliados
+  const popTotal = [...munSet].reduce((s, k) => {
+    const mun = DATA.municipios[parseInt(k)] || DATA.municipios[k] || {};
+    return s + (parseFloat(mun['População 2022']) || 0);
+  }, 0);
+
+  document.getElementById('kpi-row').innerHTML = `
+    <div class="kpi"><div class="kl">Valor Executado</div><div class="kv">${fmtR(totalVal)}</div><div class="ks">Total no período filtrado</div></div>
+    <div class="kpi" style="border-left-color:#009C3B"><div class="kl">KMs Pavimentados</div><div class="kv" style="color:#009C3B">${fmtN(totalKm)} km</div><div class="ks">Estimativa com imputação</div></div>
+    <div class="kpi" style="border-left-color:#b6790a"><div class="kl">Municípios</div><div class="kv" style="color:#b6790a">${fmtI(munSet.size)}</div><div class="ks">Com pelo menos 1 entrega</div></div>
+    <div class="kpi" style="border-left-color:#c62828"><div class="kl">Convênios</div><div class="kv" style="color:#c62828">${fmtI(convSet.size)}</div><div class="ks">Instrumentos distintos</div></div>
+    <div class="kpi" style="border-left-color:#6366f1"><div class="kl">População Beneficiária</div><div class="kv" style="color:#6366f1">${fmtI(popTotal)}</div><div class="ks">Habitantes nos municípios atendidos</div></div>
+  `;
+
+  // Evolução anual
+  const byAno = groupBy(agr, 'ANO_pgto');
+  const anos = Object.keys(byAno).sort();
+  const valsAno = anos.map(a => soma(byAno[a], metrica));
+  destroyChart('chart-evolucao');
+  const ctx1 = document.getElementById('chart-evolucao').getContext('2d');
+  charts['chart-evolucao'] = new Chart(ctx1, {
+    type: 'bar',
+    data: {
+      labels: anos,
+      datasets: [{
+        label: metrica === 'VALOR_AGREGADO' ? 'Valor Executado (R$)' : metrica === 'QTD_AGREGADA' ? 'Quantidade' : 'KMs',
+        data: valsAno,
+        backgroundColor: '#1351b4cc',
+        borderColor: '#1351b4',
+        borderWidth: 1,
+        borderRadius: 4
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false }, tooltip: {
+        callbacks: { label: ctx => metrica === 'VALOR_AGREGADO' ? fmtR(ctx.raw) : fmtN(ctx.raw) }
+      }},
+      scales: { y: { ticks: { callback: v => metrica === 'VALOR_AGREGADO' ? 'R$' + (v/1e6).toFixed(0)+'M' : fmtN(v) } } }
+    }
+  });
+
+  // Por região
+  const byReg = {};
+  agr.forEach(r => {
+    const mun = DATA.municipios[r.COD_MUNIC_IBGE] || {};
+    const reg = mun.nome_regiao || 'Não identificado';
+    byReg[reg] = (byReg[reg] || 0) + (parseFloat(r[metrica]) || 0);
+  });
+  const regs = Object.keys(byReg).sort((a,b) => byReg[b]-byReg[a]);
+  destroyChart('chart-regiao');
+  const ctx2 = document.getElementById('chart-regiao').getContext('2d');
+  charts['chart-regiao'] = new Chart(ctx2, {
+    type: 'doughnut',
+    data: {
+      labels: regs,
+      datasets: [{ data: regs.map(r => byReg[r]), backgroundColor: ['#1351b4','#009C3B','#b6790a','#c62828','#6366f1'], borderWidth: 2 }]
+    },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { font: { size: 11 } } } } }
+  });
+
+  // Por divisão
+  const byDiv = {};
+  agr.forEach(r => { const d = r.Divisao || 'Outros'; byDiv[d] = (byDiv[d]||0) + (parseFloat(r[metrica])||0); });
+  const divs = Object.keys(byDiv).sort((a,b) => byDiv[b]-byDiv[a]);
+  destroyChart('chart-divisao');
+  const ctx3 = document.getElementById('chart-divisao').getContext('2d');
+  charts['chart-divisao'] = new Chart(ctx3, {
+    type: 'bar',
+    data: {
+      labels: divs,
+      datasets: [{ data: divs.map(d => byDiv[d]), backgroundColor: ['#1351b4','#009C3B','#b6790a','#c62828','#6366f1'], borderRadius: 4 }]
+    },
+    options: {
+      indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: { x: { ticks: { callback: v => metrica === 'VALOR_AGREGADO' ? 'R$'+(v/1e6).toFixed(0)+'M' : fmtN(v) } } }
+    }
+  });
+}
+
+// ============================================================
+// ENTREGAS
+// ============================================================
+function renderEntregas(agr, metrica) {
+  const metLabel = metrica === 'VALOR_AGREGADO' ? 'Valor Executado' : metrica === 'QTD_AGREGADA' ? 'Quantidade' : 'KMs';
+  const metFmt = metrica === 'VALOR_AGREGADO' ? fmtR : fmtN;
+  const divClasses = {Obras:'bd-obras',Equipamentos:'bd-equip',Capacitações:'bd-cap',Projetos:'bd-proj',Outros:'bd-outros'};
+
+  // Anos disponíveis nos dados filtrados
+  const anos = [...new Set(agr.map(r => r.ANO_pgto).filter(Boolean))].sort();
+
+  // ---- TABELA PIVOT POR DIVISÃO/CATEGORIA ----
+  // Estrutura: { categoria: { div, byAno: {ano: val}, total } }
+  const byCat = {};
+  agr.forEach(r => {
+    const cat = r.CATEGORIA_SUGERIDA || 'Não classificado';
+    const div = r.Divisao || 'Outros';
+    const ano = r.ANO_pgto;
+    const val = parseFloat(r[metrica]) || 0;
+    if (!byCat[cat]) byCat[cat] = { div, byAno: {}, total: 0, conv: new Set() };
+    byCat[cat].byAno[ano] = (byCat[cat].byAno[ano] || 0) + val;
+    byCat[cat].total += val;
+    if (r.NR_CONVENIO) byCat[cat].conv.add(r.NR_CONVENIO);
+  });
+
+  // Agrupar por divisão para ter subtotais
+  const byDiv = {};
+  Object.entries(byCat).forEach(([cat, d]) => {
+    if (!byDiv[d.div]) byDiv[d.div] = { cats: {}, byAno: {}, total: 0, conv: new Set() };
+    byDiv[d.div].cats[cat] = d;
+    anos.forEach(a => { byDiv[d.div].byAno[a] = (byDiv[d.div].byAno[a] || 0) + (d.byAno[a] || 0); });
+    byDiv[d.div].total += d.total;
+    d.conv.forEach(c => byDiv[d.div].conv.add(c));
+  });
+
+  const totalGeral = { byAno: {}, total: 0 };
+  anos.forEach(a => { totalGeral.byAno[a] = agr.filter(r => r.ANO_pgto === a).reduce((s,r) => s + (parseFloat(r[metrica])||0), 0); });
+  totalGeral.total = soma(agr, metrica);
+
+  const tblCat = document.getElementById('tbl-categorias');
+  const divOrdem = ['Obras','Equipamentos','Capacitações','Projetos','Outros'];
+  const divsOrdenadas = [...new Set([...divOrdem, ...Object.keys(byDiv)])].filter(d => byDiv[d]);
+
+  let thead = `<tr><th>Divisão / Categoria</th>${anos.map(a=>`<th class="num">${a}</th>`).join('')}<th class="num">Total Geral</th></tr>`;
+  let tbody = '';
+
+  divsOrdenadas.forEach(div => {
+    const d = byDiv[div];
+    const dc = divClasses[div] || 'bd-outros';
+    // Linha de subtotal da divisão
+    tbody += `<tr style="background:#f0f4fa;font-weight:700;">
+      <td><span class="badge-div ${dc}">${div}</span></td>
+      ${anos.map(a => `<td class="num">${d.byAno[a] ? metFmt(d.byAno[a]) : '-'}</td>`).join('')}
+      <td class="num">${metFmt(d.total)}</td>
+    </tr>`;
+    // Linhas de categorias
+    Object.entries(d.cats).sort((a,b) => b[1].total - a[1].total).forEach(([cat, cd]) => {
+      tbody += `<tr>
+        <td style="padding-left:20px;">${cat}</td>
+        ${anos.map(a => `<td class="num">${cd.byAno[a] ? metFmt(cd.byAno[a]) : '-'}</td>`).join('')}
+        <td class="num">${metFmt(cd.total)}</td>
+      </tr>`;
+    });
+  });
+
+  tbody += `<tr class="total-row">
+    <td><strong>Total Geral</strong></td>
+    ${anos.map(a => `<td class="num"><strong>${totalGeral.byAno[a] ? metFmt(totalGeral.byAno[a]) : '-'}</strong></td>`).join('')}
+    <td class="num"><strong>${metFmt(totalGeral.total)}</strong></td>
+  </tr>`;
+
+  tblCat.querySelector('thead').innerHTML = thead;
+  tblCat.querySelector('tbody').innerHTML = tbody;
+
+  // ---- TABELA PIVOT POR TIPOLOGIA ----
+  const byTip = {};
+  agr.forEach(r => {
+    const mun = DATA.municipios[r.COD_MUNIC_IBGE] || {};
+    const t = mun.Tipologia_PNDR_3 || 'Não identificado';
+    const ano = r.ANO_pgto;
+    const val = parseFloat(r[metrica]) || 0;
+    if (!byTip[t]) byTip[t] = { byAno: {}, total: 0, muns: new Set(), conv: new Set() };
+    byTip[t].byAno[ano] = (byTip[t].byAno[ano] || 0) + val;
+    byTip[t].total += val;
+    if (r.COD_MUNIC_IBGE) byTip[t].muns.add(r.COD_MUNIC_IBGE);
+    if (r.NR_CONVENIO) byTip[t].conv.add(r.NR_CONVENIO);
+  });
+
+  const tips = Object.keys(byTip).sort((a,b) => byTip[b].total - byTip[a].total);
+  const tblTip = document.getElementById('tbl-tipologia');
+  tblTip.querySelector('thead').innerHTML = `<tr><th>Tipologia PNDR 3</th>${anos.map(a=>`<th class="num">${a}</th>`).join('')}<th class="num">Total Geral</th><th class="num">Municípios</th></tr>`;
+  tblTip.querySelector('tbody').innerHTML = tips.map(t => `
+    <tr><td>${t}</td>
+    ${anos.map(a => `<td class="num">${byTip[t].byAno[a] ? metFmt(byTip[t].byAno[a]) : '-'}</td>`).join('')}
+    <td class="num">${metFmt(byTip[t].total)}</td>
+    <td class="num">${byTip[t].muns.size}</td>
+    </tr>`).join('') + `<tr class="total-row"><td><strong>Total</strong></td>
+    ${anos.map(a => `<td class="num"><strong>${totalGeral.byAno[a] ? metFmt(totalGeral.byAno[a]) : '-'}</strong></td>`).join('')}
+    <td class="num"><strong>${metFmt(totalGeral.total)}</strong></td><td></td></tr>`;
+
+  // ---- TABELA MUNICÍPIOS (top 200, com total) ----
+  const byMun = {};
+  agr.forEach(r => {
+    const k = r.COD_MUNIC_IBGE;
+    const mun = DATA.municipios[k] || {};
+    const ano = r.ANO_pgto;
+    const val = parseFloat(r[metrica]) || 0;
+    if (!byMun[k]) byMun[k] = { nome: mun.nome || r.MUNIC_PROPONENTE, uf: mun.sigla_uf || r.UF_PROPONENTE, byAno: {}, total: 0, conv: new Set() };
+    byMun[k].byAno[ano] = (byMun[k].byAno[ano] || 0) + val;
+    byMun[k].total += val;
+    if (r.NR_CONVENIO) byMun[k].conv.add(r.NR_CONVENIO);
+  });
+  const muns = Object.keys(byMun).sort((a,b) => byMun[b].total - byMun[a].total).slice(0,200);
+  const tblMun = document.getElementById('tbl-municipios');
+  tblMun.querySelector('thead').innerHTML = `<tr><th>Município</th><th>UF</th>${anos.map(a=>`<th class="num">${a}</th>`).join('')}<th class="num">Total Geral</th><th class="num">Conv.</th></tr>`;
+  tblMun.querySelector('tbody').innerHTML = muns.map(k => `
+    <tr><td>${byMun[k].nome}</td><td>${byMun[k].uf}</td>
+    ${anos.map(a => `<td class="num">${byMun[k].byAno[a] ? metFmt(byMun[k].byAno[a]) : '-'}</td>`).join('')}
+    <td class="num">${metFmt(byMun[k].total)}</td>
+    <td class="num">${byMun[k].conv.size}</td>
+    </tr>`).join('');
+}
+
+// ============================================================
+// MAPA PER CAPITA
+// ============================================================
+function renderMapa(agr) {
+  // Calcular per capita por município
+  const byMun = {};
+  agr.forEach(r => {
+    const k = String(r.COD_MUNIC_IBGE);
+    if (!byMun[k]) byMun[k] = { val: 0, nome: '', uf: '' };
+    byMun[k].val += parseFloat(r.VALOR_AGREGADO)||0;
+    const mun = DATA.municipios[r.COD_MUNIC_IBGE] || {};
+    byMun[k].nome = mun.nome || r.MUNIC_PROPONENTE || k;
+    byMun[k].uf = mun.sigla_uf || '';
+  });
+
+  Object.keys(byMun).forEach(k => {
+    const mun = DATA.municipios[parseInt(k)] || DATA.municipios[k] || {};
+    const pop = parseFloat(mun['População 2022']) || 1;
+    byMun[k].pc = byMun[k].val / pop;
+  });
+
+  const vals = Object.values(byMun).map(m => m.pc).filter(v => v > 0).sort((a,b)=>a-b);
+  const breaks = jenks(vals, 5);
+
+  const colors = ['#f7fbff','#c6dbef','#6baed6','#2171b5','#08306b'];
+  function getColor(v) {
+    for (let i = breaks.length-1; i >= 0; i--) if (v >= breaks[i]) return colors[Math.min(i, colors.length-1)];
+    return '#f0f0f0';
+  }
+
+  if (mapInstance) { mapInstance.remove(); mapInstance = null; }
+  mapInstance = L.map('map-percapita', { zoomControl: true }).setView([-14, -51], 4);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors', maxZoom: 19 }).addTo(mapInstance);
+
+  // Mapear cod6 → dados
+  const cod6Map = {};
+  Object.keys(byMun).forEach(k => {
+    const cod6 = k.slice(0, 6).padStart(6, '0');
+    cod6Map[cod6] = byMun[k];
+  });
+
+  L.geoJSON(DATA.geojson, {
+    style: feature => {
+      const cod6 = feature.properties.cod6 || '';
+      const d = cod6Map[cod6];
+      return { fillColor: d ? getColor(d.pc) : '#f0f0f0', weight: 0.3, color: '#ccc', fillOpacity: d ? 0.85 : 0.2 };
+    },
+    onEachFeature: (feature, layer) => {
+      const cod6 = feature.properties.cod6 || '';
+      const d = cod6Map[cod6];
+      if (d) {
+        layer.bindTooltip(`<strong>${d.nome} (${d.uf})</strong><br>Per capita: ${fmtR(d.pc)}<br>Total: ${fmtR(d.val)}`, { sticky: true });
+      }
+    }
+  }).addTo(mapInstance);
+
+  // Legenda
+  const legend = L.control({ position: 'bottomright' });
+  legend.onAdd = () => {
+    const div = L.DomUtil.create('div','legend');
+    div.innerHTML = '<strong>Per capita (R$)</strong><br>' +
+      breaks.slice(0,-1).map((b,i) => `<i style="background:${colors[i]};width:14px;height:14px;display:inline-block;margin-right:6px;border-radius:2px;vertical-align:middle"></i>${fmtR(b)} – ${fmtR(breaks[i+1])}<br>`).join('');
+    return div;
+  };
+  legend.addTo(mapInstance);
+
+  // Top 10
+  const top10 = Object.entries(byMun).sort((a,b) => b[1].pc - a[1].pc).slice(0,10).reverse();
+  destroyChart('chart-top10');
+  const ctx = document.getElementById('chart-top10').getContext('2d');
+  charts['chart-top10'] = new Chart(ctx, {
+    type:'bar', data:{
+      labels: top10.map(([,d]) => d.nome + ' (' + d.uf + ')'),
+      datasets:[{data: top10.map(([,d]) => d.pc), backgroundColor:'#1351b4cc', borderRadius:4}]
+    },
+    options:{ indexAxis:'y', responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}},
+      scales:{x:{ticks:{callback: v => fmtR(v)}}} }
+  });
+
+  // Tabela per capita por UF
+  const byUF_pc = {};
+  Object.keys(byMun).forEach(k => {
+    const mun = DATA.municipios[parseInt(k)] || DATA.municipios[k] || {};
+    const uf = mun.sigla_uf || '';
+    if (!uf) return;
+    if (!byUF_pc[uf]) byUF_pc[uf] = { val: 0, pop: 0, muns: new Set() };
+    byUF_pc[uf].val += byMun[k].val;
+    byUF_pc[uf].pop += parseFloat(mun['População 2022']) || 0;
+    byUF_pc[uf].muns.add(k);
+  });
+  const ufs_pc = Object.keys(byUF_pc).filter(u => byUF_pc[u].pop > 0).sort((a,b) => (byUF_pc[b].val/byUF_pc[b].pop) - (byUF_pc[a].val/byUF_pc[a].pop));
+  const tblUF = document.getElementById('tbl-pc-uf');
+  tblUF.querySelector('thead').innerHTML = '<tr><th>UF</th><th class="num">Municípios</th><th class="num">Valor Executado</th><th class="num">Pop. 2022</th><th class="num">Per capita</th></tr>';
+  tblUF.querySelector('tbody').innerHTML = ufs_pc.map(u => `
+    <tr><td>${u}</td><td class="num">${byUF_pc[u].muns.size}</td><td class="num">${fmtR(byUF_pc[u].val)}</td><td class="num">${fmtI(byUF_pc[u].pop)}</td><td class="num">${fmtR(byUF_pc[u].val/byUF_pc[u].pop)}</td></tr>
+  `).join('');
+
+  // Por região
+  const byReg = {};
+  Object.keys(byMun).forEach(k => {
+    const mun = DATA.municipios[parseInt(k)] || {};
+    const reg = mun.nome_regiao || 'N/I';
+    if (!byReg[reg]) byReg[reg] = { val: 0, pop: 0 };
+    byReg[reg].val += byMun[k].val;
+    byReg[reg].pop += parseFloat(mun['População 2022'])||0;
+  });
+  const regs = Object.keys(byReg).filter(r => byReg[r].pop > 0).sort((a,b) => byReg[b].val/byReg[b].pop - byReg[a].val/byReg[a].pop);
+  destroyChart('chart-regiao-pc');
+  const ctx2 = document.getElementById('chart-regiao-pc').getContext('2d');
+  charts['chart-regiao-pc'] = new Chart(ctx2, {
+    type:'bar', data:{
+      labels: regs,
+      datasets:[{data: regs.map(r => byReg[r].val/byReg[r].pop), backgroundColor:'#009C3Bcc', borderRadius:4}]
+    },
+    options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}},
+      scales:{y:{ticks:{callback: v => fmtR(v)}}} }
+  });
+}
+
+// Jenks simplificado
+function jenks(data, k) {
+  if (data.length < k) return [data[0]||0, data[data.length-1]||0];
+  const n = data.length;
+  const step = Math.floor(n / k);
+  const breaks = [data[0]];
+  for (let i = 1; i < k; i++) breaks.push(data[Math.min(i*step, n-1)]);
+  breaks.push(data[n-1]);
+  return [...new Set(breaks)].sort((a,b)=>a-b);
+}
+
+// ============================================================
+// A EXECUTAR
+// ============================================================
+function renderAExecutar(aex) {
+  const totalGlobal = soma(aex, 'MAX_VL_GLOBAL_CONV');
+  const totalExec = soma(aex, 'SOMA_VALOR_AGREGADO');
+  const totalAEx = soma(aex, 'VALOR_A_EXECUTAR');
+  const convSet = new Set(aex.map(r => r.NR_CONVENIO));
+
+  document.getElementById('kpi-aexecutar').innerHTML = `
+    <div class="kpi"><div class="kl">Valor Global</div><div class="kv">${fmtR(totalGlobal)}</div><div class="ks">Total contratado</div></div>
+    <div class="kpi" style="border-left-color:#009C3B"><div class="kl">Já Executado</div><div class="kv" style="color:#009C3B">${fmtR(totalExec)}</div><div class="ks">${totalGlobal > 0 ? (totalExec/totalGlobal*100).toFixed(1)+'%' : '-'} do total</div></div>
+    <div class="kpi" style="border-left-color:#c62828"><div class="kl">A Executar</div><div class="kv" style="color:#c62828">${fmtR(totalAEx)}</div><div class="ks">Saldo restante</div></div>
+    <div class="kpi" style="border-left-color:#b6790a"><div class="kl">Convênios Ativos</div><div class="kv" style="color:#b6790a">${fmtI(convSet.size)}</div><div class="ks">Com saldo a executar</div></div>
+  `;
+
+  // Anos disponíveis nos dados filtrados (ANO_Convenio)
+  const anos = [...new Set(aex.map(r => r.ANO_Convenio).filter(Boolean))].sort();
+
+  // ---- PIVOT POR REGIÃO ----
+  const byReg = {};
+  aex.forEach(r => {
+    const mun = DATA.municipios[r.COD_MUNIC_IBGE] || {};
+    const reg = mun.nome_regiao || 'N/I';
+    const ano = r.ANO_Convenio;
+    if (!byReg[reg]) byReg[reg] = { global:0, exec:0, aex:0, byAno:{}, conv: new Set() };
+    byReg[reg].global += parseFloat(r.MAX_VL_GLOBAL_CONV)||0;
+    byReg[reg].exec += parseFloat(r.SOMA_VALOR_AGREGADO)||0;
+    byReg[reg].aex += parseFloat(r.VALOR_A_EXECUTAR)||0;
+    byReg[reg].byAno[ano] = (byReg[reg].byAno[ano]||0) + (parseFloat(r.VALOR_A_EXECUTAR)||0);
+    if (r.NR_CONVENIO) byReg[reg].conv.add(r.NR_CONVENIO);
+  });
+  const regs = Object.keys(byReg).sort((a,b) => byReg[b].aex - byReg[a].aex);
+  const tblR = document.getElementById('tbl-aexec-regiao');
+  tblR.querySelector('thead').innerHTML = `<tr><th>Região</th>${anos.map(a=>`<th class="num">${a}</th>`).join('')}<th class="num">Total A Executar</th><th class="num">% Exec.</th><th class="num">Convênios</th></tr>`;
+  tblR.querySelector('tbody').innerHTML = regs.map(r => `
+    <tr><td>${r}</td>
+    ${anos.map(a=>`<td class="num">${byReg[r].byAno[a] ? fmtR(byReg[r].byAno[a]) : '-'}</td>`).join('')}
+    <td class="num">${fmtR(byReg[r].aex)}</td>
+    <td class="num">${byReg[r].global > 0 ? (byReg[r].exec/byReg[r].global*100).toFixed(1)+'%' : '-'}</td>
+    <td class="num">${byReg[r].conv.size}</td></tr>
+  `).join('') + `<tr class="total-row"><td><strong>Total</strong></td>
+    ${anos.map(a=>`<td class="num"><strong>${fmtR(regs.reduce((s,r)=>s+(byReg[r].byAno[a]||0),0))}</strong></td>`).join('')}
+    <td class="num"><strong>${fmtR(totalAEx)}</strong></td>
+    <td class="num"><strong>${totalGlobal>0?(totalExec/totalGlobal*100).toFixed(1)+'%':'-'}</strong></td>
+    <td class="num"><strong>${convSet.size}</strong></td></tr>`;
+
+  // ---- PIVOT POR UF ----
+  const byUF = {};
+  aex.forEach(r => {
+    const mun = DATA.municipios[r.COD_MUNIC_IBGE] || {};
+    const uf = mun.sigla_uf || r.UF_PROPONENTE || 'N/I';
+    const ano = r.ANO_Convenio;
+    if (!byUF[uf]) byUF[uf] = { global:0, exec:0, aex:0, byAno:{}, conv: new Set() };
+    byUF[uf].global += parseFloat(r.MAX_VL_GLOBAL_CONV)||0;
+    byUF[uf].exec += parseFloat(r.SOMA_VALOR_AGREGADO)||0;
+    byUF[uf].aex += parseFloat(r.VALOR_A_EXECUTAR)||0;
+    byUF[uf].byAno[ano] = (byUF[uf].byAno[ano]||0) + (parseFloat(r.VALOR_A_EXECUTAR)||0);
+    if (r.NR_CONVENIO) byUF[uf].conv.add(r.NR_CONVENIO);
+  });
+  const ufs = Object.keys(byUF).sort((a,b) => byUF[b].aex - byUF[a].aex);
+  const tblU = document.getElementById('tbl-aexec-uf');
+  tblU.querySelector('thead').innerHTML = `<tr><th>UF</th>${anos.map(a=>`<th class="num">${a}</th>`).join('')}<th class="num">Total A Executar</th><th class="num">% Exec.</th></tr>`;
+  tblU.querySelector('tbody').innerHTML = ufs.map(u => `
+    <tr><td>${u}</td>
+    ${anos.map(a=>`<td class="num">${byUF[u].byAno[a] ? fmtR(byUF[u].byAno[a]) : '-'}</td>`).join('')}
+    <td class="num">${fmtR(byUF[u].aex)}</td>
+    <td class="num">${byUF[u].global > 0 ? (byUF[u].exec/byUF[u].global*100).toFixed(1)+'%' : '-'}</td></tr>
+  `).join('');
+
+  // ---- POR SITUAÇÃO ----
+  const bySit = {};
+  aex.forEach(r => {
+    const s = r.SIT_CONVENIO || 'N/I';
+    if (!bySit[s]) bySit[s] = { conv: new Set(), aex:0 };
+    if (r.NR_CONVENIO) bySit[s].conv.add(r.NR_CONVENIO);
+    bySit[s].aex += parseFloat(r.VALOR_A_EXECUTAR)||0;
+  });
+  const sits = Object.keys(bySit).sort((a,b) => bySit[b].aex - bySit[a].aex);
+  const tblS = document.getElementById('tbl-aexec-sit');
+  tblS.querySelector('thead').innerHTML = '<tr><th>Situação</th><th class="num">Convênios</th><th class="num">Valor a Executar</th></tr>';
+  tblS.querySelector('tbody').innerHTML = sits.map(s => `
+    <tr><td>${s}</td><td class="num">${bySit[s].conv.size}</td><td class="num">${fmtR(bySit[s].aex)}</td></tr>
+  `).join('');
+}
+
+// ============================================================
+// EXPORT XLSX
+// ============================================================
+function exportTable(tableId, nome) {
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.table_to_sheet(document.getElementById(tableId));
+  XLSX.utils.book_append_sheet(wb, ws, nome);
+  XLSX.writeFile(wb, nome + '.xlsx');
+}
+
+function exportChart(chartId, nome) {
+  const agr = filtrarAgregado();
+  const metrica = document.getElementById('f-metrica').value;
+  const byAno = groupBy(agr, 'ANO_pgto');
+  const anos = Object.keys(byAno).sort();
+  const rows = [['Ano', metrica]].concat(anos.map(a => [a, soma(byAno[a], metrica)]));
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  XLSX.utils.book_append_sheet(wb, ws, nome);
+  XLSX.writeFile(wb, nome + '.xlsx');
+}
+
+// ============================================================
+// EVENTOS — FILTROS
+// ============================================================
+function atualizarUFs() {
+  const regSel = document.getElementById('f-regiao').value;
+  const ufs = [...new Set(
+    Object.values(DATA.municipios)
+      .filter(m => !regSel || m.nome_regiao === regSel)
+      .map(m => m.sigla_uf).filter(Boolean)
+  )].sort();
+  const curUF = document.getElementById('f-uf').value;
+  document.getElementById('f-uf').innerHTML = '<option value="">Todos</option>' + ufs.map(u => `<option ${u===curUF?'selected':''}>${u}</option>`).join('');
+}
+
+function atualizarAcoes() {
+  const progSel = document.getElementById('f-programa').value;
+  const acoes = [...new Set(DATA.agregado.filter(r => !progSel || r.PROGRAMA === progSel).map(r => r.ACAO).filter(Boolean))].sort();
+  document.getElementById('f-acao').innerHTML = '<option value="">Todas</option>' + acoes.map(a => `<option>${a}</option>`).join('');
+}
+
+document.getElementById('f-ano-ini').onchange = e => { FILTROS.anoIni = e.target.value; renderizar(); };
+document.getElementById('f-ano-fim').onchange = e => { FILTROS.anoFim = e.target.value; renderizar(); };
+document.getElementById('f-metrica').onchange = () => renderizar();
+document.getElementById('f-regiao').onchange = e => { FILTROS.regiao = e.target.value; atualizarUFs(); FILTROS.uf = ''; document.getElementById('f-uf').value = ''; renderizar(); };
+document.getElementById('f-uf').onchange = e => { FILTROS.uf = e.target.value; renderizar(); };
+document.getElementById('f-programa').onchange = e => { FILTROS.programa = e.target.value; atualizarAcoes(); FILTROS.acao = ''; renderizar(); };
+document.getElementById('f-acao').onchange = e => { FILTROS.acao = e.target.value; renderizar(); };
+document.getElementById('f-origem').onchange = e => { FILTROS.origem = e.target.value; renderizar(); };
+document.getElementById('f-tipologia').onchange = e => { FILTROS.tipologia = e.target.value; renderizar(); };
+document.getElementById('f-rota').onchange = e => { FILTROS.rota = e.target.value; renderizar(); };
+
+// Flags abrangência
+document.querySelectorAll('.seg button[data-flag]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const flag = btn.dataset.flag;
+    btn.closest('.seg').querySelectorAll('button').forEach(b => b.classList.remove('on'));
+    btn.classList.add('on');
+    FILTROS.flags[flag] = btn.dataset.val;
+    renderizar();
+  });
+});
+
+// Nav
+document.querySelectorAll('nav.topnav a').forEach(a => {
+  a.addEventListener('click', () => {
+    document.querySelectorAll('nav.topnav a').forEach(x => x.classList.remove('active'));
+    a.classList.add('active');
+    document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+    document.getElementById('view-' + a.dataset.view).classList.add('active');
+    renderizar();
+  });
+});
+
+function resetFiltros() {
+  FILTROS = { anoIni: '', anoFim: '', regiao: '', uf: '', programa: '', acao: '', origem: '', tipologia: '', rota: '', instrumento: '', situacoes: new Set(), flags: {} };
+  ['f-regiao','f-uf','f-programa','f-acao','f-origem','f-tipologia','f-rota'].forEach(id => document.getElementById(id).value = '');
+  document.querySelectorAll('#f-situacao-checks input[type=checkbox]').forEach(cb => cb.checked = false);
+  setInstrumento('');
+  document.querySelectorAll('.seg button[data-flag]').forEach(btn => {
+    btn.classList.toggle('on', btn.dataset.val === '');
+  });
+  popularFiltros();
+  renderizar();
+}
+
+// ============================================================
+// SITUAÇÃO E INSTRUMENTO
+// ============================================================
+function toggleSituacao(sit, checked) {
+  if (checked) FILTROS.situacoes.add(sit);
+  else FILTROS.situacoes.delete(sit);
+  renderizar();
+}
+
+function setFlag(flag, val) {
+  FILTROS.flags[flag] = val;
+  renderizar();
+}
+
+function setInstrumento(val) {
+  FILTROS.instrumento = val;
+  ['btn-inst-todos','btn-inst-sim','btn-inst-nao'].forEach(id => document.getElementById(id).classList.remove('on'));
+  const map = {'':'btn-inst-todos','SIM':'btn-inst-sim','NAO':'btn-inst-nao'};
+  document.getElementById(map[val]).classList.add('on');
+  renderizar();
+}
+
+// ============================================================
+// MUNICIPAL
+// ============================================================
+function filtrarMunicipiosBusca() {
+  const busca = (document.getElementById('f-mun-busca').value || '').toLowerCase();
+  const ufSel = document.getElementById('f-mun-uf-sel').value;
+  const sel = document.getElementById('f-mun-sel');
+  const muns = Object.entries(DATA.municipios)
+    .filter(([,m]) => {
+      if (ufSel && m.sigla_uf !== ufSel) return false;
+      if (busca && !((m.nome||'').toLowerCase().includes(busca))) return false;
+      return true;
+    })
+    .sort((a,b) => (a[1].nome||'').localeCompare(b[1].nome||''));
+  sel.innerHTML = '<option value="">Selecione o município...</option>' + muns.map(([k,m]) => `<option value="${k}">${m.nome} (${m.sigla_uf})</option>`).join('');
+}
+
+function selecionarMunicipio() {
+  const cod = document.getElementById('f-mun-sel').value;
+  if (!cod) {
+    document.getElementById('mun-conteudo').style.display = 'none';
+    document.getElementById('mun-placeholder').style.display = 'block';
+    return;
+  }
+  document.getElementById('mun-placeholder').style.display = 'none';
+  document.getElementById('mun-conteudo').style.display = 'block';
+  renderMunicipal(parseInt(cod));
+}
+
+function renderMunicipal(cod) {
+  const mun = DATA.municipios[cod] || {};
+  // Usa filtrarAgregado() para respeitar todos os filtros globais, depois filtra pelo município
+  const agrMun = filtrarAgregado().filter(r => r.COD_MUNIC_IBGE == cod);
+  const aexMun = filtrarAExecutar().filter(r => r.COD_MUNIC_IBGE == cod);
+
+  document.getElementById('mun-titulo').textContent = (mun.nome || cod) + ' — ' + (mun.sigla_uf || '');
+  document.getElementById('mun-desc').textContent =
+    `Tipologia PNDR: ${mun.Tipologia_PNDR_3 || 'N/I'} · Região: ${mun.nome_regiao || 'N/I'} · Pop. 2022: ${fmtI(mun['População 2022'] || 0)} hab.`;
+
+  const totalVal = soma(agrMun, 'VALOR_AGREGADO');
+  const totalKm = soma(agrMun, 'KM_estimado');
+  const totalAEx = soma(aexMun, 'VALOR_A_EXECUTAR');
+  const convSet = new Set(agrMun.map(r => r.NR_CONVENIO));
+  const pop = parseFloat(mun['População 2022']) || 1;
+
+  document.getElementById('kpi-municipal').innerHTML = `
+    <div class="kpi"><div class="kl">Valor Executado</div><div class="kv">${fmtR(totalVal)}</div><div class="ks">Total histórico</div></div>
+    <div class="kpi" style="border-left-color:#009C3B"><div class="kl">Per capita</div><div class="kv" style="color:#009C3B">${fmtR(totalVal/pop)}</div><div class="ks">Por habitante</div></div>
+    <div class="kpi" style="border-left-color:#b6790a"><div class="kl">KMs Pavimentados</div><div class="kv" style="color:#b6790a">${fmtN(totalKm)} km</div><div class="ks">Estimativa</div></div>
+    <div class="kpi" style="border-left-color:#c62828"><div class="kl">A Executar</div><div class="kv" style="color:#c62828">${fmtR(totalAEx)}</div><div class="ks">Saldo restante</div></div>
+    <div class="kpi" style="border-left-color:#6366f1"><div class="kl">Convênios</div><div class="kv" style="color:#6366f1">${fmtI(convSet.size)}</div><div class="ks">Instrumentos distintos</div></div>
+  `;
+
+  // Tabela por categoria
+  const byCat = {};
+  agrMun.forEach(r => {
+    const k = r.CATEGORIA_SUGERIDA || 'N/C';
+    if (!byCat[k]) byCat[k] = { div: r.Divisao||'Outros', val:0, qtd:0, km:0 };
+    byCat[k].val += parseFloat(r.VALOR_AGREGADO)||0;
+    byCat[k].qtd += parseFloat(r.QTD_AGREGADA)||0;
+    byCat[k].km += parseFloat(r.KM_estimado)||0;
+  });
+  const divClasses = {Obras:'bd-obras',Equipamentos:'bd-equip',Capacitações:'bd-cap',Projetos:'bd-proj',Outros:'bd-outros'};
+  const tblCat = document.getElementById('tbl-mun-cat');
+  tblCat.querySelector('thead').innerHTML = '<tr><th>Categoria</th><th>Divisão</th><th class="num">Valor Executado</th><th class="num">Qtd</th><th class="num">KMs</th></tr>';
+  tblCat.querySelector('tbody').innerHTML = Object.entries(byCat).sort((a,b)=>b[1].val-a[1].val).map(([cat,d]) =>
+    `<tr><td>${cat}</td><td><span class="badge-div ${divClasses[d.div]||'bd-outros'}">${d.div}</span></td><td class="num">${fmtR(d.val)}</td><td class="num">${fmtN(d.qtd)}</td><td class="num">${fmtN(d.km)}</td></tr>`
+  ).join('') + `<tr class="total-row"><td colspan="2"><strong>Total</strong></td><td class="num"><strong>${fmtR(totalVal)}</strong></td><td class="num"></td><td class="num"><strong>${fmtN(totalKm)}</strong></td></tr>`;
+
+  // Gráfico evolução anual
+  const byAno = groupBy(agrMun, 'ANO_pgto');
+  const anos = Object.keys(byAno).sort();
+  destroyChart('chart-mun-evolucao');
+  const ctx = document.getElementById('chart-mun-evolucao').getContext('2d');
+  charts['chart-mun-evolucao'] = new Chart(ctx, {
+    type: 'bar',
+    data: { labels: anos, datasets: [{ label: 'Valor Executado', data: anos.map(a => soma(byAno[a],'VALOR_AGREGADO')), backgroundColor:'#1351b4cc', borderRadius:4 }] },
+    options: { responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{y:{ticks:{callback:v=>'R$'+(v/1e6).toFixed(1)+'M'}}} }
+  });
+
+  // Tabela de convênios
+  const convs = {};
+  agrMun.forEach(r => {
+    const k = r.NR_CONVENIO;
+    if (!convs[k]) convs[k] = { sit: r.SIT_CONVENIO, ano: r.ANO_Convenio, prog: r.PROGRAMA, val:0, global: r.VL_GLOBAL_CONV };
+    convs[k].val += parseFloat(r.VALOR_AGREGADO)||0;
+  });
+  const aexConvs = {};
+  aexMun.forEach(r => { aexConvs[r.NR_CONVENIO] = parseFloat(r.VALOR_A_EXECUTAR)||0; });
+
+  const tblConv = document.getElementById('tbl-mun-conv');
+  tblConv.querySelector('thead').innerHTML = '<tr><th>Nº Convênio</th><th>Programa</th><th>Situação</th><th class="num">Ano</th><th class="num">Valor Global</th><th class="num">Executado</th><th class="num">A Executar</th></tr>';
+  tblConv.querySelector('tbody').innerHTML = Object.entries(convs).sort((a,b)=>b[1].val-a[1].val).map(([nr,c]) =>
+    `<tr><td>${nr}</td><td style="font-size:11px">${c.prog||'-'}</td><td style="font-size:11px">${c.sit||'-'}</td><td class="num">${c.ano||'-'}</td><td class="num">${fmtR(parseFloat(c.global)||0)}</td><td class="num">${fmtR(c.val)}</td><td class="num">${fmtR(aexConvs[nr]||0)}</td></tr>`
+  ).join('');
+}
+
+// ============================================================
+// INICIAR
+// ============================================================
+carregarDados();
+</script>
+</body>
+</html>
