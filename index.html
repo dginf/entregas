@@ -345,6 +345,7 @@ tr.total-row td{font-weight:700;background:#eef2f9;border-top:2px solid var(--pr
     <!-- A EXECUTAR -->
     <div class="view" id="view-a-executar">
       <div class="kpi-row" id="kpi-aexecutar"></div>
+      <div id="nota-aexecutar"></div>
       <div class="card">
         <div class="card-header">
           <h2>Saldo a Executar por Região</h2>
@@ -1074,10 +1075,19 @@ function renderAExecutar(aex) {
 
   document.getElementById('kpi-aexecutar').innerHTML = `
     <div class="kpi"><div class="kl">Valor Global</div><div class="kv">${fmtR(totalGlobal)}</div><div class="ks">Total contratado</div></div>
-    <div class="kpi" style="border-left-color:#009C3B"><div class="kl">Já Executado</div><div class="kv" style="color:#009C3B">${fmtR(totalExec)}</div><div class="ks">${totalGlobal > 0 ? (totalExec/totalGlobal*100).toFixed(1)+'%' : '-'} do total</div></div>
+    <div class="kpi" style="border-left-color:#009C3B"><div class="kl">Valor Pago (histórico)</div><div class="kv" style="color:#009C3B">${fmtR(totalExec)}</div><div class="ks">${totalGlobal > 0 ? (totalExec/totalGlobal*100).toFixed(1)+'%' : '-'} do total contratado</div></div>
     <div class="kpi" style="border-left-color:#c62828"><div class="kl">A Executar</div><div class="kv" style="color:#c62828">${fmtR(totalAEx)}</div><div class="ks">Saldo restante</div></div>
     <div class="kpi" style="border-left-color:#b6790a"><div class="kl">Convênios Ativos</div><div class="kv" style="color:#b6790a">${fmtI(convSet.size)}</div><div class="ks">Com saldo a executar</div></div>
   `;
+
+  // Nota metodológica
+  const notaEl = document.getElementById('nota-aexecutar');
+  if (notaEl) notaEl.innerHTML = `
+    <div style="background:#eef2f9;border-left:3px solid #1351b4;padding:10px 14px;border-radius:6px;font-size:12px;color:#444;margin-bottom:14px;">
+      ℹ️ <strong>Nota:</strong> O <em>Valor Pago (histórico)</em> reflete o total desembolsado ao longo da vida do convênio, independente do ano de pagamento.
+      O filtro de período desta aba atua sobre o <strong>ano de assinatura do convênio</strong>, não sobre o ano de pagamento —
+      por isso os valores podem diferir da aba <strong>Visão Geral</strong>, que filtra por ano de pagamento.
+    </div>`;
 
   // Anos disponíveis nos dados filtrados (ANO_Convenio)
   const anos = [...new Set(aex.map(r => r.ANO_Convenio).filter(Boolean))].sort();
